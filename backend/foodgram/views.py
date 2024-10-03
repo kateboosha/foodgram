@@ -1,14 +1,15 @@
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.http import HttpResponse
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from .models import User, Tag, Ingredient, Recipe, Favorite, ShoppingCart
+from .models import User, Tag, Ingredient, Recipe, Favorite, ShoppingCart, RecipeIngredient
 from .serializers import (
     UserSerializer, TagSerializer, IngredientSerializer, RecipeSerializer, 
-    FavoriteSerializer, ShoppingCartSerializer
+    FavoriteSerializer,
 )
-
-from rest_framework import permissions
 
 
 class IsAuthorOrReadOnly(permissions.BasePermission):
@@ -110,14 +111,6 @@ class FavoriteViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-
-from django.http import HttpResponse
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action
-from rest_framework import viewsets
-from .models import ShoppingCart, RecipeIngredient
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
 
 
 class ShoppingCartViewSet(viewsets.ModelViewSet):
