@@ -1,26 +1,51 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.core.validators import RegexValidator
+from django.conf import settings
 
 
 class User(AbstractUser):
-    email = models.EmailField(unique=True)
+
+    email = models.EmailField(unique=True, max_length=254)
+    username = models.CharField(
+        max_length=150,
+        unique=True,
+        validators=[
+            RegexValidator(
+                regex=r'^[\w.@+-]+$',
+                message='Username may contain only letters, numbers, and @/./+/-/_ characters.',
+                code='invalid_username'
+            )
+        ]
+    )
+
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
     avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
     is_subscribed = models.BooleanField(default=False)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ("username", "first_name", "last_name")
 
-    groups = models.ManyToManyField(
-        'auth.Group',
-        related_name='foodgram_users',
-        blank=True
-    )
 
-    user_permissions = models.ManyToManyField(
-        'auth.Permission',
-        related_name='foodgram_user_permissions',
-        blank=True
+class Subscription(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='subscriptions',
+        on_delete=models.CASCADE
     )
+    subscribed_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='subscribers',
+        on_delete=models.CASCADE
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'subscribed_to')
+
+    def __str__(self):
+        return f"{self.user.username} subscribed to {self.subscribed_to.username}"
 
 
 class Tag(models.Model):
@@ -40,12 +65,12 @@ class Ingredient(models.Model):
 
 
 class Recipe(models.Model):
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    author = models.ForeignKey(User, related_name='recipes', on_delete=models.CASCADE)
     name = models.CharField(max_length=256)
     image = models.ImageField(upload_to="recipes/")
     description = models.TextField()
-    ingredients = models.ManyToManyField(Ingredient, through="RecipeIngredient")
-    tags = models.ManyToManyField(Tag)
+    ingredients = models.ManyToManyField(Ingredient, through="RecipeIngredient", related_name='recipes')
+    tags = models.ManyToManyField(Tag, related_name='recipes')
     cooking_time = models.PositiveIntegerField()
     is_favorited = models.BooleanField(default=False)
     is_in_shopping_cart = models.BooleanField(default=False)
@@ -55,8 +80,8 @@ class Recipe(models.Model):
 
 
 class RecipeIngredient(models.Model):
-    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
-    ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE)
+    recipe = models.ForeignKey(Recipe, related_name='recipe_ingredients', on_delete=models.CASCADE)
+    ingredient = models.ForeignKey(Ingredient, related_name='ingredient_recipes', on_delete=models.CASCADE)
     amount = models.PositiveIntegerField()
 
     class Meta:
