@@ -4,6 +4,8 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+import hashlib
+from django.conf import settings
 import base64
 from djoser.views import UserViewSet
 from rest_framework import permissions
@@ -221,6 +223,36 @@ class RecipeViewSet(viewsets.ModelViewSet):
         # Обеспечим корректную структуру данных при возврате ответа
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def destroy(self, request, *args, **kwargs):
+        """Переопределяем метод удаления рецепта."""
+        instance = self.get_object()
+
+        # Проверка на права доступа: только автор может удалить рецепт
+        if instance.author != request.user:
+            return Response({"detail": "Вы не можете удалить чужой рецепт."},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        # Удаление собственного рецепта
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
+    def get_link(self, request, pk=None):
+        """Генерация короткой ссылки для рецепта."""
+        recipe = self.get_object()
+
+        # Генерация уникальной строки на основе ID рецепта
+        short_link_hash = hashlib.md5(str(recipe.id).encode()).hexdigest()[:6]
+
+        # Получаем базовый URL для короткой ссылки из настроек
+        base_url = getattr(settings, 'SHORT_LINK_BASE_URL', 'http://localhost:8000/')
+        
+        # Сформируем короткую ссылку без 's'
+        short_link = f"{base_url}{short_link_hash}"
+
+        # Вернем результат
+        return Response({"short-link": short_link}, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def shopping_cart(self, request, pk=None):
         """Добавляет или удаляет рецепт из корзины."""
@@ -277,10 +309,161 @@ class RecipeViewSet(viewsets.ModelViewSet):
             favorite.delete()
             return Response({"status": "removed from favorites"}, status=status.HTTP_204_NO_CONTENT)
         return Response({"status": "not in favorites"}, status=status.HTTP_400_BAD_REQUEST)
-    
+
+    # Реализация подписок
+    @action(detail=True, methods=['delete'], permission_classes=[IsAuthenticated])
+    def unsubscribe(self, request, pk=None):
+        """Удаление подписки на автора."""
+        user = request.user
+        author = get_object_or_404(User, pk=pk)
+
+        subscription = Subscription.objects.filter(user=user, subscribed_to=author).first()
+
+        # Проверка на наличие подписки
+        if subscription:
+            subscription.delete()
+            return Response({"status": "unsubscribed"}, status=status.HTTP_204_NO_CONTENT)
+
+        # Обработка попытки удалить несуществующую подписку
+        return Response({"status": "Subscription not found"}, status=status.HTTP_400_BAD_REQUEST)
+
 
     
         """
+        class RecipeViewSet(viewsets.ModelViewSet):
+    queryset = Recipe.objects.all()
+    serializer_class = RecipeSerializer
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filterset_fields = ('author', 'tags__slug')
+    search_fields = ('^name',)
+    pagination_class = CustomPagination
+    permission_classes_by_action = {
+        "list": (AllowAny,),
+        "retrieve": (AllowAny,),
+        "create": (IsAuthenticated,),
+        "update": (IsAuthenticated,),
+        "partial_update": (IsAuthenticated,),
+        "destroy": (IsAuthenticated,),
+    }
+
+    def get_permissions(self):
+        return [
+            permission() for permission in self.permission_classes_by_action.get(
+                self.action, self.permission_classes
+            )
+        ]
+
+    def get_queryset(self):
+   
+        queryset = Recipe.objects.all()
+        user = self.request.user
+        is_favorited = self.request.query_params.get('is_favorited')
+
+        if is_favorited and user.is_authenticated:
+            if is_favorited == '1':
+                queryset = queryset.filter(favorites__user=user)
+            elif is_favorited == '0':
+                queryset = queryset.exclude(favorites__user=user)
+
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(author=request.user)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        # Проверка на права доступа: только автор может обновить рецепт
+        if instance.author != request.user:
+            return Response({"detail": "Вы не имеете права обновлять этот рецепт."},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        # Обеспечим корректную структуру данных при возврате ответа
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
+    def get_link(self, request, pk=None):
+  
+        recipe = self.get_object()
+
+        # Генерация уникальной строки на основе ID рецепта
+        short_link_hash = hashlib.md5(str(recipe.id).encode()).hexdigest()[:6]
+
+        # Получаем базовый URL для короткой ссылки из настроек
+        base_url = getattr(settings, 'SHORT_LINK_BASE_URL', 'http://localhost:8000/')
+        
+        # Сформируем короткую ссылку без 's'
+        short_link = f"{base_url}{short_link_hash}"
+
+        # Вернем результат
+        return Response({"short-link": short_link}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
+    def shopping_cart(self, request, pk=None):
+
+        if request.method == 'POST':
+            return self.add_to_cart(request, pk)
+        return self.remove_from_cart(request, pk)
+
+    def add_to_cart(self, request, pk):
+        user = request.user
+        recipe = self.get_object()
+        # Проверка, есть ли уже рецепт в корзине
+        if ShoppingCart.objects.filter(user=user, recipe=recipe).exists():
+            return Response({"detail": "Recipe is already in the shopping cart."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Если рецепт не в корзине, добавляем его
+        ShoppingCart.objects.create(user=user, recipe=recipe)
+        return Response({"status": "added to cart"}, status=status.HTTP_201_CREATED)
+
+    def remove_from_cart(self, request, pk):
+        user = request.user
+        recipe = self.get_object()
+        cart_item = ShoppingCart.objects.filter(user=user, recipe=recipe).first()
+
+        if cart_item:
+            cart_item.delete()
+            return Response({"status": "removed from cart"}, status=status.HTTP_204_NO_CONTENT)
+        return Response({"status": "not in cart"}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
+    def favorite(self, request, pk=None):
+
+        recipe = self.get_object()
+        user = request.user
+
+        if request.method == 'POST':
+            return self.add_to_favorites(user, recipe)
+        elif request.method == 'DELETE':
+            return self.remove_from_favorites(user, recipe)
+
+    def add_to_favorites(self, user, recipe):
+
+        serializer = FavoriteSerializer(data={'recipe': recipe}, context={'request': self.request, 'recipe': recipe})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Вернем детализированную информацию о рецепте
+        response_serializer = RecipeSerializer(recipe, context={'request': self.request})
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    def remove_from_favorites(self, user, recipe):
+   
+        favorite = Favorite.objects.filter(user=user, recipe=recipe)
+        if favorite.exists():
+            favorite.delete()
+            return Response({"status": "removed from favorites"}, status=status.HTTP_204_NO_CONTENT)
+        return Response({"status": "not in favorites"}, status=status.HTTP_400_BAD_REQUEST)
+    
 
         @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def favorite(self, request, pk=None):
