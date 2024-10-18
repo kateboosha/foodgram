@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 import hashlib
+from django.shortcuts import get_object_or_404
 from django.conf import settings
 import base64
 from djoser.views import UserViewSet
@@ -118,28 +119,6 @@ class CustomViewSet(UserViewSet):
             user.avatar.delete(save=True)
             user.save()
             return Response(status=status.HTTP_204_NO_CONTENT)
-    
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
-    def subscribe(self, request, pk=None):
-        user = request.user
-        try:
-            subscribed_to = User.objects.get(pk=pk)
-        except User.DoesNotExist:
-            return Response({"detail": "Пользователь не найден."}, status=status.HTTP_404_NOT_FOUND)
-
-        if user == subscribed_to:
-            return Response({"detail": "Невозможно подписаться на самого себя."},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        # Проверка на существующую подписку
-        if Subscription.objects.filter(user=user, subscribed_to=subscribed_to).exists():
-            return Response({"detail": "Вы уже подписаны на этого пользователя."},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        # Создание подписки
-        subscription = Subscription.objects.create(user=user, subscribed_to=subscribed_to)
-        serializer = SubscriptionSerializer(subscription, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
@@ -187,16 +166,25 @@ class RecipeViewSet(viewsets.ModelViewSet):
         ]
 
     def get_queryset(self):
-        """Фильтрует рецепты по параметру is_favorited."""
+        """Фильтрует рецепты по параметрам is_favorited и is_in_shopping_cart."""
         queryset = Recipe.objects.all()
         user = self.request.user
-        is_favorited = self.request.query_params.get('is_favorited')
 
+        # Фильтрация по параметру is_favorited
+        is_favorited = self.request.query_params.get('is_favorited')
         if is_favorited and user.is_authenticated:
             if is_favorited == '1':
                 queryset = queryset.filter(favorites__user=user)
             elif is_favorited == '0':
                 queryset = queryset.exclude(favorites__user=user)
+
+        # Фильтрация по параметру is_in_shopping_cart
+        is_in_shopping_cart = self.request.query_params.get('is_in_shopping_cart')
+        if is_in_shopping_cart and user.is_authenticated:
+            if is_in_shopping_cart == '1':
+                queryset = queryset.filter(shoppingcart__user=user)
+            elif is_in_shopping_cart == '0':
+                queryset = queryset.exclude(shoppingcart__user=user)
 
         return queryset
 
@@ -236,7 +224,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
+    @action(detail=True, methods=['get'], url_path='get-link')
     def get_link(self, request, pk=None):
         """Генерация короткой ссылки для рецепта."""
         recipe = self.get_object()
@@ -247,7 +235,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         # Получаем базовый URL для короткой ссылки из настроек
         base_url = getattr(settings, 'SHORT_LINK_BASE_URL', 'http://localhost:8000/')
         
-        # Сформируем короткую ссылку без 's'
+        # Сформируем короткую ссылку
         short_link = f"{base_url}{short_link_hash}"
 
         # Вернем результат
@@ -310,10 +298,91 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return Response({"status": "removed from favorites"}, status=status.HTTP_204_NO_CONTENT)
         return Response({"status": "not in favorites"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Реализация подписок
+
+class SubscriptionViewSet(viewsets.ViewSet):
+    queryset = Subscription.objects.all()
+    serializer_class = SubscriptionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        user = request.user
+        queryset = user.subscriptions.all()  # Предполагаем, что у пользователя есть поле subscriptions
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = SubscriptionSerializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+
+        serializer = SubscriptionSerializer(queryset, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def subscribe(self, request, pk=None):
+        author = get_object_or_404(User, pk=pk)
+
+        if author == request.user:
+            return Response(
+                {"detail": "Нельзя подписаться на самого себя."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if Subscription.objects.filter(user=request.user, subscribed_to=author).exists():
+            return Response(
+                {"detail": "Вы уже подписаны на этого пользователя."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        Subscription.objects.create(user=request.user, subscribed_to=author)
+        serializer = SubscriptionSerializer(author, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=['delete'], permission_classes=[IsAuthenticated])
     def unsubscribe(self, request, pk=None):
-        """Удаление подписки на автора."""
+        author = get_object_or_404(User, pk=pk)
+
+        subscription = Subscription.objects.filter(user=request.user, subscribed_to=author)
+        if subscription.exists():
+            subscription.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        return Response(
+            {"detail": "Вы не подписаны на этого пользователя."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+
+    
+        """ 
+
+class SubscriptionViewSet(viewsets.ModelViewSet):
+    serializer_class = SubscriptionSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        
+        return Subscription.objects.filter(user=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        subscribed_to_id = request.data.get('subscribed_to')
+        subscribed_to = get_object_or_404(User, id=subscribed_to_id)
+
+        if request.user == subscribed_to:
+            return Response({"detail": "Нельзя подписаться на самого себя."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if Subscription.objects.filter(user=request.user, subscribed_to=subscribed_to).exists():
+            return Response({"detail": "Вы уже подписаны на этого пользователя."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        subscription = Subscription.objects.create(user=request.user, subscribed_to=subscribed_to)
+        serializer = self.get_serializer(subscription)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        было в рецептах
+
+            @action(detail=True, methods=['delete'], permission_classes=[IsAuthenticated])
+    def unsubscribe(self, request, pk=None):
+
         user = request.user
         author = get_object_or_404(User, pk=pk)
 
@@ -326,10 +395,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         # Обработка попытки удалить несуществующую подписку
         return Response({"status": "Subscription not found"}, status=status.HTTP_400_BAD_REQUEST)
-
-
-    
-        """
         class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializer
@@ -583,6 +648,31 @@ class ShoppingCartViewSet(viewsets.ModelViewSet):
 
 
 """
+
+кусок из юзерского вьюсета 
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def subscribe(self, request, pk=None):
+        user = request.user
+        try:
+            subscribed_to = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"detail": "Пользователь не найден."}, status=status.HTTP_404_NOT_FOUND)
+
+        if user == subscribed_to:
+            return Response({"detail": "Невозможно подписаться на самого себя."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Проверка на существующую подписку
+        if Subscription.objects.filter(user=user, subscribed_to=subscribed_to).exists():
+            return Response({"detail": "Вы уже подписаны на этого пользователя."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Создание подписки
+        subscription = Subscription.objects.create(user=user, subscribed_to=subscribed_to)
+        serializer = SubscriptionSerializer(subscription, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 class FavoriteViewSet(viewsets.ModelViewSet):
     serializer_class = FavoriteSerializer
     permission_classes = (IsAuthenticated,)

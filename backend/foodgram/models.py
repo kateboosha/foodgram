@@ -29,23 +29,13 @@ class User(AbstractUser):
 
 
 class Subscription(models.Model):
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        related_name='subscriptions',
-        on_delete=models.CASCADE
-    )
-    subscribed_to = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        related_name='subscribers',
-        on_delete=models.CASCADE
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='subscriptions')
+    subscribed_to = models.ForeignKey(User, on_delete=models.CASCADE, related_name='subscribers')
 
     class Meta:
-        unique_together = ('user', 'subscribed_to')
-
-    def __str__(self):
-        return f"{self.user.username} subscribed to {self.subscribed_to.username}"
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'subscribed_to'], name='unique_subscription')
+        ]
 
 
 class Tag(models.Model):
