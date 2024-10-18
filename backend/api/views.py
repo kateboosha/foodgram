@@ -119,6 +119,43 @@ class CustomViewSet(UserViewSet):
             user.avatar.delete(save=True)
             user.save()
             return Response(status=status.HTTP_204_NO_CONTENT)
+        
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='subscribe')
+    def subscribe(self, request, id=None):
+        author = get_object_or_404(User, id=id)
+
+        if author == request.user:
+            return Response(
+                {"detail": "Нельзя подписаться на самого себя."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if Subscription.objects.filter(user=request.user, subscribed_to=author).exists():
+            return Response(
+                {"detail": "Вы уже подписаны на этого пользователя."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        Subscription.objects.create(user=request.user, subscribed_to=author)
+        serializer = CustomUserSerializer(author, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='subscriptions')
+    def subscriptions(self, request):
+        """Получаем список пользователей, на которых подписан текущий пользователь."""
+        user = request.user
+        subscriptions = Subscription.objects.filter(user=user).select_related('subscribed_to')
+        authors = [sub.subscribed_to for sub in subscriptions]
+
+        # Пагинация
+        page = self.paginate_queryset(authors)
+        if page is not None:
+            serializer = CustomUserSerializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+
+        serializer = CustomUserSerializer(authors, many=True, context={'request': request})
+        return Response(serializer.data)
+        
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
@@ -298,57 +335,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return Response({"status": "removed from favorites"}, status=status.HTTP_204_NO_CONTENT)
         return Response({"status": "not in favorites"}, status=status.HTTP_400_BAD_REQUEST)
 
-
-class SubscriptionViewSet(viewsets.ViewSet):
-    queryset = Subscription.objects.all()
-    serializer_class = SubscriptionSerializer
-    permission_classes = [IsAuthenticated]
-
-    def list(self, request):
-        user = request.user
-        queryset = user.subscriptions.all()  # Предполагаем, что у пользователя есть поле subscriptions
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = SubscriptionSerializer(page, many=True, context={'request': request})
-            return self.get_paginated_response(serializer.data)
-
-        serializer = SubscriptionSerializer(queryset, many=True, context={'request': request})
-        return Response(serializer.data)
-
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
-    def subscribe(self, request, pk=None):
-        author = get_object_or_404(User, pk=pk)
-
-        if author == request.user:
-            return Response(
-                {"detail": "Нельзя подписаться на самого себя."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if Subscription.objects.filter(user=request.user, subscribed_to=author).exists():
-            return Response(
-                {"detail": "Вы уже подписаны на этого пользователя."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        Subscription.objects.create(user=request.user, subscribed_to=author)
-        serializer = SubscriptionSerializer(author, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    @action(detail=True, methods=['delete'], permission_classes=[IsAuthenticated])
-    def unsubscribe(self, request, pk=None):
-        author = get_object_or_404(User, pk=pk)
-
-        subscription = Subscription.objects.filter(user=request.user, subscribed_to=author)
-        if subscription.exists():
-            subscription.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        return Response(
-            {"detail": "Вы не подписаны на этого пользователя."},
-            status=status.HTTP_400_BAD_REQUEST
-        )
 
 
 
