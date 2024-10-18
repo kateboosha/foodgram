@@ -107,6 +107,36 @@ class UserRecipeRelation(models.Model):
         ]
 
 
+class Favorite(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="favorites"
+    )
+    recipe = models.ForeignKey(
+        'Recipe',
+        on_delete=models.CASCADE,
+        related_name="favorites"
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'recipe'], name='unique_favorite')
+        ]
+
+    def __str__(self):
+        return f'{self.user.email} добавил {self.recipe.name} в избранное'
+
+
+""" 
+
+class Favorite(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    recipe = models.ForeignKey('Recipe', on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('user', 'recipe') 
+
 class Favorite(UserRecipeRelation):
     class Meta(UserRecipeRelation.Meta):
         db_table = "favorite"
@@ -116,7 +146,7 @@ class Favorite(UserRecipeRelation):
                 name="unique_favorite_recipe"
             )
         ]
-
+"""
 
 class ShoppingCart(UserRecipeRelation):
     class Meta(UserRecipeRelation.Meta):

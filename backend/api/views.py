@@ -184,6 +184,20 @@ class RecipeViewSet(viewsets.ModelViewSet):
             )
         ]
 
+    def get_queryset(self):
+        """Фильтрует рецепты по параметру is_favorited."""
+        queryset = Recipe.objects.all()
+        user = self.request.user
+        is_favorited = self.request.query_params.get('is_favorited')
+
+        if is_favorited and user.is_authenticated:
+            if is_favorited == '1':
+                queryset = queryset.filter(favorites__user=user)
+            elif is_favorited == '0':
+                queryset = queryset.exclude(favorites__user=user)
+
+        return queryset
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -211,20 +225,91 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def shopping_cart(self, request, pk=None):
         """Добавляет или удаляет рецепт из корзины."""
         if request.method == 'POST':
-            return self.perform_action(request, pk, add=True, model=ShoppingCart, status_message="added to cart")
-        return self.perform_action(request, pk, add=False, model=ShoppingCart, status_message="removed from cart")
+            return self.add_to_cart(request, pk)
+        return self.remove_from_cart(request, pk)
 
-    def perform_action(self, request, pk, add, model, status_message):
+    def add_to_cart(self, request, pk):
         user = request.user
         recipe = self.get_object()
-        if add:
-            model.objects.get_or_create(user=user, recipe=recipe)
-            return Response({"status": status_message}, status=status.HTTP_201_CREATED)
-        else:
-            obj = model.objects.filter(user=user, recipe=recipe).first()
-            if obj:
-                obj.delete()
-            return Response({"status": status_message}, status=status.HTTP_204_NO_CONTENT)
+        # Проверка, есть ли уже рецепт в корзине
+        if ShoppingCart.objects.filter(user=user, recipe=recipe).exists():
+            return Response({"detail": "Recipe is already in the shopping cart."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Если рецепт не в корзине, добавляем его
+        ShoppingCart.objects.create(user=user, recipe=recipe)
+        return Response({"status": "added to cart"}, status=status.HTTP_201_CREATED)
+
+    def remove_from_cart(self, request, pk):
+        user = request.user
+        recipe = self.get_object()
+        cart_item = ShoppingCart.objects.filter(user=user, recipe=recipe).first()
+
+        if cart_item:
+            cart_item.delete()
+            return Response({"status": "removed from cart"}, status=status.HTTP_204_NO_CONTENT)
+        return Response({"status": "not in cart"}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
+    def favorite(self, request, pk=None):
+        """Добавляет или удаляет рецепт из избранного."""
+        recipe = self.get_object()
+        user = request.user
+
+        if request.method == 'POST':
+            return self.add_to_favorites(user, recipe)
+        elif request.method == 'DELETE':
+            return self.remove_from_favorites(user, recipe)
+
+    def add_to_favorites(self, user, recipe):
+        """Логика добавления рецепта в избранное."""
+        serializer = FavoriteSerializer(data={'recipe': recipe}, context={'request': self.request, 'recipe': recipe})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Вернем детализированную информацию о рецепте
+        response_serializer = RecipeSerializer(recipe, context={'request': self.request})
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    def remove_from_favorites(self, user, recipe):
+        """Логика удаления рецепта из избранного."""
+        favorite = Favorite.objects.filter(user=user, recipe=recipe)
+        if favorite.exists():
+            favorite.delete()
+            return Response({"status": "removed from favorites"}, status=status.HTTP_204_NO_CONTENT)
+        return Response({"status": "not in favorites"}, status=status.HTTP_400_BAD_REQUEST)
+    
+
+    
+        """
+
+        @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
+    def favorite(self, request, pk=None):
+        
+        recipe = self.get_object()
+        user = request.user
+
+        if request.method == 'POST':
+            return self.add_to_favorites(user, recipe)
+        elif request.method == 'DELETE':
+            return self.remove_from_favorites(user, recipe)
+
+    def add_to_favorites(self, user, recipe):
+        
+        serializer = FavoriteSerializer(data={'recipe': recipe.id}, context={'request': self.request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+    # Вернем детализированную информацию о рецепте
+        response_serializer = RecipeSerializer(recipe, context={'request': self.request})
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    def remove_from_favorites(self, user, recipe):
+       
+        favorite = Favorite.objects.filter(user=user, recipe=recipe)
+        if favorite.exists():
+            favorite.delete()
+            return Response({"status": "removed from favorites"}, status=status.HTTP_204_NO_CONTENT)
+        return Response({"status": "not in favorites"}, status=status.HTTP_400_BAD_REQUEST)
         
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def favorite(self, request, pk=None):
@@ -247,6 +332,55 @@ class RecipeViewSet(viewsets.ModelViewSet):
         recipe = self.get_object()
         user = request.user
         favorite = Favorite.objects.filter(user=user, recipe=recipe)
+        
+        if not favorite.exists():
+            return Response(
+                {'error': 'Recipe not found in favorites.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        favorite.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    """
+        
+
+class FavoriteViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    # Добавление рецепта в избранное
+    @action(detail=True, methods=['post'], url_path='favorite')
+    def create(self, request, pk=None):
+        try:
+            recipe = Recipe.objects.get(id=pk)
+        except Recipe.DoesNotExist:
+            return Response(
+                {'error': 'Recipe not found.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        favorite, created = Favorite.objects.get_or_create(user=request.user, recipe=recipe)
+        
+        if not created:
+            return Response(
+                {'error': 'Recipe is already in favorites.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = FavoriteSerializer(recipe)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    # Удаление рецепта из избранного
+    @action(detail=True, methods=['delete'], url_path='favorite')
+    def destroy(self, request, pk=None):
+        try:
+            recipe = Recipe.objects.get(id=pk)
+        except Recipe.DoesNotExist:
+            return Response(
+                {'error': 'Recipe not found.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        favorite = Favorite.objects.filter(user=request.user, recipe=recipe)
         
         if not favorite.exists():
             return Response(

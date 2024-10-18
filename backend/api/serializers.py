@@ -233,8 +233,31 @@ class RecipeSerializer(serializers.ModelSerializer):
     def get_is_in_shopping_cart(self, obj):
         user = self.context.get('request').user
         return user.is_authenticated and ShoppingCart.objects.filter(user=user, recipe=obj).exists()
+    
+
+class FavoriteSerializer(serializers.ModelSerializer):
+    # Используем вложенный сериализатор для рецепта
+    recipe = RecipeSerializer(read_only=True)
+
+    class Meta:
+        model = Favorite
+        fields = ("recipe",)
+
+    def validate(self, data):
+        user = self.context["request"].user
+        recipe = self.context.get("recipe")  # Получаем рецепт из контекста, переданного из ViewSet
+        if Favorite.objects.filter(user=user, recipe=recipe).exists():
+            raise serializers.ValidationError("This recipe is already in favorites.")
+        data["recipe"] = recipe  # Добавляем объект рецепта в данные для дальнейшего использования
+        return data
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        recipe = validated_data["recipe"]
+        return Favorite.objects.create(user=user, recipe=recipe)
 
 
+"""
 class FavoriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Favorite
@@ -246,7 +269,7 @@ class FavoriteSerializer(serializers.ModelSerializer):
         if Favorite.objects.filter(user=user, recipe=recipe).exists():
             raise serializers.ValidationError("This recipe is already in favorites.")
         return data
-
+"""
 
 class ShoppingCartSerializer(serializers.ModelSerializer):
     recipe = RecipeSerializer(read_only=True)
