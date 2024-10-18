@@ -30,7 +30,6 @@ class IsAuthorOrReadOnly(permissions.BasePermission):
         # Разрешить доступ, если пользователь является автором объекта
         return obj.author == request.user
 
-
 class CustomViewSet(UserViewSet):
     serializer_class = CustomUserSerializer
     pagination_class = CustomPagination
@@ -136,9 +135,18 @@ class CustomViewSet(UserViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Создание подписки
         Subscription.objects.create(user=request.user, subscribed_to=author)
+        
+        # Сериализуем данные автора
         serializer = CustomUserSerializer(author, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        data = serializer.data
+        
+        # Добавляем недостающие поля в ответ вручную
+        data['recipes'] = RecipeSerializer(author.recipes.all(), many=True, context={'request': request}).data
+        data['recipes_count'] = author.recipes.count()
+        
+        return Response(data, status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='subscriptions')
     def subscriptions(self, request):
@@ -154,8 +162,7 @@ class CustomViewSet(UserViewSet):
             return self.get_paginated_response(serializer.data)
 
         serializer = CustomUserSerializer(authors, many=True, context={'request': request})
-        return Response(serializer.data)
-        
+        return Response(serializer.data)        
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
