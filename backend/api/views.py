@@ -30,6 +30,7 @@ class IsAuthorOrReadOnly(permissions.BasePermission):
         # Разрешить доступ, если пользователь является автором объекта
         return obj.author == request.user
 
+
 class CustomViewSet(UserViewSet):
     serializer_class = CustomUserSerializer
     pagination_class = CustomPagination
@@ -39,6 +40,76 @@ class CustomViewSet(UserViewSet):
         "retrieve": (AllowAny,),
         "set_password": (IsAuthenticated,),
     }
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='subscribe')
+    def subscribe(self, request, id=None):
+        author = get_object_or_404(User, id=id)
+
+        if author == request.user:
+            return Response(
+                {"detail": "Нельзя подписаться на самого себя."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Проверяем, есть ли уже подписка на этого пользователя
+        if Subscription.objects.filter(user=request.user, subscribed_to=author).exists():
+            return Response(
+                {"detail": "Вы уже подписаны на этого пользователя."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Создание подписки
+        Subscription.objects.create(user=request.user, subscribed_to=author)
+
+        # Сериализуем данные автора
+        serializer = CustomUserSerializer(author, context={'request': request})
+        data = serializer.data
+
+        # Получаем список рецептов автора с лимитом, если указан
+        recipes_limit = request.query_params.get('recipes_limit')
+        if recipes_limit is not None:
+            recipes = author.recipes.all()[:int(recipes_limit)]
+        else:
+            recipes = author.recipes.all()
+
+        data['recipes'] = RecipeSerializer(recipes, many=True, context={'request': request}).data
+        data['recipes_count'] = author.recipes.count()
+
+        # Возвращаем корректный статус 201
+        return Response(data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='subscriptions')
+    def subscriptions(self, request):
+        """Получаем список пользователей, на которых подписан текущий пользователь."""
+        user = request.user
+        subscriptions = Subscription.objects.filter(user=user).select_related('subscribed_to')
+        authors = [sub.subscribed_to for sub in subscriptions]
+
+        # Получаем параметр recipes_limit из запроса, если он существует
+        recipes_limit = request.query_params.get('recipes_limit')
+
+        # Подготовка данных для каждого автора
+        results = []
+        for author in authors:
+         # Ограничиваем количество рецептов, если указано recipes_limit
+            if recipes_limit is not None:
+                recipes = author.recipes.all()[:int(recipes_limit)]
+            else:
+                recipes = author.recipes.all()
+
+        # Формируем данные для каждого автора с учетом рецептов и их количества
+            author_data = CustomUserSerializer(author, context={'request': request}).data
+            author_data['recipes'] = RecipeSerializer(recipes, many=True, context={'request': request}).data
+            author_data['recipes_count'] = author.recipes.count()
+
+            results.append(author_data)
+
+    # Пагинация
+        page = self.paginate_queryset(results)
+        if page is not None:
+            return self.get_paginated_response(page)
+
+        return Response({'results': results})
 
     def create(self, request, *args, **kwargs):
         serializer = UserRegistrationSerializer(data=request.data)
@@ -118,51 +189,6 @@ class CustomViewSet(UserViewSet):
             user.avatar.delete(save=True)
             user.save()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='subscribe')
-    def subscribe(self, request, id=None):
-        author = get_object_or_404(User, id=id)
-
-        if author == request.user:
-            return Response(
-                {"detail": "Нельзя подписаться на самого себя."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if Subscription.objects.filter(user=request.user, subscribed_to=author).exists():
-            return Response(
-                {"detail": "Вы уже подписаны на этого пользователя."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Создание подписки
-        Subscription.objects.create(user=request.user, subscribed_to=author)
-        
-        # Сериализуем данные автора
-        serializer = CustomUserSerializer(author, context={'request': request})
-        data = serializer.data
-        
-        # Добавляем недостающие поля в ответ вручную
-        data['recipes'] = RecipeSerializer(author.recipes.all(), many=True, context={'request': request}).data
-        data['recipes_count'] = author.recipes.count()
-        
-        return Response(data, status=status.HTTP_201_CREATED)
-    
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='subscriptions')
-    def subscriptions(self, request):
-        """Получаем список пользователей, на которых подписан текущий пользователь."""
-        user = request.user
-        subscriptions = Subscription.objects.filter(user=user).select_related('subscribed_to')
-        authors = [sub.subscribed_to for sub in subscriptions]
-
-        # Пагинация
-        page = self.paginate_queryset(authors)
-        if page is not None:
-            serializer = CustomUserSerializer(page, many=True, context={'request': request})
-            return self.get_paginated_response(serializer.data)
-
-        serializer = CustomUserSerializer(authors, many=True, context={'request': request})
-        return Response(serializer.data)        
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
