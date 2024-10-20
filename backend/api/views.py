@@ -236,11 +236,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
         ]
 
     def get_queryset(self):
-        """Фильтрует рецепты по параметрам is_favorited и is_in_shopping_cart."""
+        """Фильтрует рецепты по параметрам is_favorited, is_in_shopping_cart и tags."""
         queryset = Recipe.objects.all()
         user = self.request.user
 
-        # Фильтрация по параметру is_favorited
+    # Фильтрация по параметру is_favorited
         is_favorited = self.request.query_params.get('is_favorited')
         if is_favorited and user.is_authenticated:
             if is_favorited == '1':
@@ -248,13 +248,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
             elif is_favorited == '0':
                 queryset = queryset.exclude(favorites__user=user)
 
-        # Фильтрация по параметру is_in_shopping_cart
+    # Фильтрация по параметру is_in_shopping_cart
         is_in_shopping_cart = self.request.query_params.get('is_in_shopping_cart')
         if is_in_shopping_cart and user.is_authenticated:
             if is_in_shopping_cart == '1':
                 queryset = queryset.filter(shoppingcart__user=user)
             elif is_in_shopping_cart == '0':
                 queryset = queryset.exclude(shoppingcart__user=user)
+
+    # Фильтрация по тегам (логика "ИЛИ")
+        tags = self.request.query_params.getlist('tags')
+        if tags:
+            queryset = queryset.filter(tags__slug__in=tags).distinct()
 
         return queryset
 
