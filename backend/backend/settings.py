@@ -1,14 +1,18 @@
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-)!gxbclv#d9ljcr(_tuv2dzzh^98qsr+ngc1j55(xa^afa3sq$'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
-DEBUG = True
+DEBUG = bool(int(os.getenv('DEBUG', 0)))
 
-ALLOWED_HOSTS = ['*']
-SHORT_LINK_BASE_URL = "http://localhost:8000/"
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') + ['localhost']
+
+SHORT_LINK_BASE_URL = os.getenv('SHORT_LINK_BASE_URL', 'http://localhost:8000/')
 
 
 INSTALLED_APPS = [
