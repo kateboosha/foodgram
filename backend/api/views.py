@@ -15,7 +15,7 @@ from foodgram.models import Favorite, Ingredient, Recipe, ShoppingCart, Tag, Sub
 from .serializers import (CustomUserSerializer, FavoriteSerializer,
                           IngredientSerializer, RecipeSerializer,
                           TagSerializer, UserRegistrationSerializer, AvatarSerializer,
-                          ShortRecipeSerializer
+                          ShortRecipeSerializer, ShoppingCartRecipeSerializer
                         )
 from .pagination import CustomPagination
 
@@ -327,13 +327,17 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def add_to_cart(self, request, pk):
         user = request.user
         recipe = self.get_object()
+
         # Проверка, есть ли уже рецепт в корзине
         if ShoppingCart.objects.filter(user=user, recipe=recipe).exists():
             return Response({"detail": "Recipe is already in the shopping cart."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Если рецепт не в корзине, добавляем его
         ShoppingCart.objects.create(user=user, recipe=recipe)
-        return Response({"status": "added to cart"}, status=status.HTTP_201_CREATED)
+
+        # Используем сериализатор для возврата корректных данных
+        recipe_data = ShoppingCartRecipeSerializer(recipe, context={'request': request}).data
+        return Response(recipe_data, status=status.HTTP_201_CREATED)
 
     def remove_from_cart(self, request, pk):
         user = request.user
@@ -344,7 +348,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             cart_item.delete()
             return Response({"status": "removed from cart"}, status=status.HTTP_204_NO_CONTENT)
         return Response({"status": "not in cart"}, status=status.HTTP_400_BAD_REQUEST)
-
+    
     @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def favorite(self, request, pk=None):
         """Добавляет или удаляет рецепт из избранного."""
@@ -362,8 +366,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
-        # Вернем детализированную информацию о рецепте
-        response_serializer = RecipeSerializer(recipe, context={'request': self.request})
+        # Используем ShortRecipeSerializer для возврата нужных данных
+        response_serializer = ShortRecipeSerializer(recipe, context={'request': self.request})
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     def remove_from_favorites(self, user, recipe):
@@ -373,7 +377,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
             favorite.delete()
             return Response({"status": "removed from favorites"}, status=status.HTTP_204_NO_CONTENT)
         return Response({"status": "not in favorites"}, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 

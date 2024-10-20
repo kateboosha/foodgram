@@ -271,7 +271,14 @@ class FavoriteSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         recipe = validated_data["recipe"]
         return Favorite.objects.create(user=user, recipe=recipe)
-    
+
+
+class ShoppingCartRecipeSerializer(serializers.ModelSerializer):
+    """Сериализатор для рецепта при добавлении в корзину."""
+    class Meta:
+        model = Recipe
+        fields = ('id', 'name', 'image', 'cooking_time')  
+
 
 class ShoppingCartSerializer(serializers.ModelSerializer):
     recipe = RecipeSerializer(read_only=True)
