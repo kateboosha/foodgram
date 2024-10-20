@@ -15,7 +15,7 @@ from foodgram.models import Favorite, Ingredient, Recipe, ShoppingCart, Tag, Sub
 from .serializers import (CustomUserSerializer, FavoriteSerializer,
                           IngredientSerializer, RecipeSerializer,
                           TagSerializer, UserRegistrationSerializer, AvatarSerializer,
-                          SubscriptionSerializer,
+                          ShortRecipeSerializer
                         )
 from .pagination import CustomPagination
 
@@ -72,7 +72,8 @@ class CustomViewSet(UserViewSet):
         else:
             recipes = author.recipes.all()
 
-        data['recipes'] = RecipeSerializer(recipes, many=True, context={'request': request}).data
+        # Используем сокращенный сериализатор для рецептов
+        data['recipes'] = ShortRecipeSerializer(recipes, many=True, context={'request': request}).data
         data['recipes_count'] = author.recipes.count()
 
         # Возвращаем корректный статус 201
@@ -91,20 +92,20 @@ class CustomViewSet(UserViewSet):
         # Подготовка данных для каждого автора
         results = []
         for author in authors:
-         # Ограничиваем количество рецептов, если указано recipes_limit
+            # Ограничиваем количество рецептов, если указано recipes_limit
             if recipes_limit is not None:
                 recipes = author.recipes.all()[:int(recipes_limit)]
             else:
                 recipes = author.recipes.all()
 
-        # Формируем данные для каждого автора с учетом рецептов и их количества
+            # Используем сокращенный сериализатор для рецептов
             author_data = CustomUserSerializer(author, context={'request': request}).data
-            author_data['recipes'] = RecipeSerializer(recipes, many=True, context={'request': request}).data
+            author_data['recipes'] = ShortRecipeSerializer(recipes, many=True, context={'request': request}).data
             author_data['recipes_count'] = author.recipes.count()
 
             results.append(author_data)
 
-    # Пагинация
+        # Пагинация
         page = self.paginate_queryset(results)
         if page is not None:
             return self.get_paginated_response(page)

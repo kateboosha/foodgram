@@ -244,7 +244,12 @@ class RecipeSerializer(serializers.ModelSerializer):
     def get_is_in_shopping_cart(self, obj):
         user = self.context.get('request').user
         return user.is_authenticated and ShoppingCart.objects.filter(user=user, recipe=obj).exists()
-    
+
+class ShortRecipeSerializer(serializers.ModelSerializer):
+    """Сериализатор для отображения рецептов с минимальным набором полей."""
+    class Meta:
+        model = Recipe
+        fields = ('id', 'name', 'image', 'cooking_time')
 
 class FavoriteSerializer(serializers.ModelSerializer):
     # Используем вложенный сериализатор для рецепта
