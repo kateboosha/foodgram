@@ -116,11 +116,12 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'backend_static' / 'static'
-
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = '/app/media/'
+
+
+STATIC_URL = '/static/django/'
+STATIC_ROOT = '/app/static_django/'
 
 
 LANGUAGE_CODE = 'en-us'
