@@ -1,16 +1,17 @@
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from django.core.management.utils import get_random_secret_key
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', get_random_secret_key())
 
-DEBUG = bool(int(os.getenv('DEBUG', 0)))
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('true', '1')
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') + ['localhost']
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 SHORT_LINK_BASE_URL = os.getenv('SHORT_LINK_BASE_URL', 'http://localhost:8000/')
 
@@ -118,6 +119,10 @@ AUTH_PASSWORD_VALIDATORS = [
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+STATIC_URL = '/static/django/'
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'static_django')
+
 LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'UTC'
@@ -125,8 +130,6 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
-
-STATIC_URL = 'static/'
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
