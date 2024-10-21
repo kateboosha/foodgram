@@ -12,7 +12,7 @@ services:
     env_file:
       - ../.env
     ports:
-      - 5432:5432
+      - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
 
@@ -28,9 +28,8 @@ services:
 
   frontend:
     image: kateboosha/foodgram-frontend:latest
-    command: cp -r /app/build/. /app/result_build/
     volumes:
-      - static_frontend:/app/result_build/
+      - ../frontend/build:/app/result_build/
 
   nginx:
     image: nginx:1.19.3
@@ -41,7 +40,7 @@ services:
       - static:/static_django/
       - media:/media/
       - ../docs/:/usr/share/nginx/html/api/docs/
-      - static_frontend:/static_frontend/
+      - ../frontend/build:/usr/share/nginx/html/
     depends_on:
       - backend
       - frontend
