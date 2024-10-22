@@ -6,6 +6,8 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
 from reportlab.lib.pagesizes import letter
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -484,8 +486,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
         response["Content-Disposition"] = (
             'attachment; filename="shopping_cart.pdf"'
         )
+
+        pdfmetrics.registerFont(TTFont("DejaVuSans", "DejaVuSans.ttf"))
+
         p = canvas.Canvas(response, pagesize=letter)
-        p.setFont("Helvetica", 12)
+        p.setFont("DejaVuSans", 12)
         _, height = letter
         y = height - 40
 
@@ -517,7 +522,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             y -= 20
             if y < 40:
                 p.showPage()
-                p.setFont("Helvetica", 12)
+                p.setFont("DejaVuSans", 12)
                 y = height - 40
 
         p.showPage()
