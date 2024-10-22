@@ -12,7 +12,7 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', get_random_secret_key())
 
 DEBUG = True
 
-#DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('true', '1')
+# DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('true', '1')
 
 ALLOWED_HOSTS = 'foodgram.fun', 'localhost', '127.0.0.1'
 
