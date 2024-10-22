@@ -1,6 +1,8 @@
 import base64
+
 from django.core.files.base import ContentFile
 from rest_framework import serializers
+
 from foodgram.models import (
     User,
     Tag,
@@ -31,6 +33,7 @@ class Base64ImageField(serializers.ImageField):
 
 class AvatarSerializer(serializers.ModelSerializer):
     """Сериализатор для обработки аватара в формате Base64."""
+
     avatar = Base64ImageField(required=False, allow_null=True)
 
     class Meta:
@@ -40,6 +43,7 @@ class AvatarSerializer(serializers.ModelSerializer):
 
 class CustomUserSerializer(serializers.ModelSerializer):
     """Полноценный сериализатор для вьюсета пользователей."""
+
     password = serializers.CharField(write_only=True, min_length=8)
     is_subscribed = serializers.SerializerMethodField()
     avatar = Base64ImageField(required=False, allow_null=True)
@@ -75,6 +79,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     """Отправляем в сеттинги для странички регистрации."""
+
     password = serializers.CharField(write_only=True)
 
     class Meta:
