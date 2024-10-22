@@ -4,6 +4,7 @@ from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from djoser.views import UserViewSet
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from rest_framework import filters, status, viewsets
@@ -11,30 +12,15 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from djoser.views import UserViewSet
+from foodgram.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
+                             ShoppingCart, Subscription, Tag, User)
 
-from foodgram.models import (
-    Favorite,
-    Ingredient,
-    Recipe,
-    RecipeIngredient,
-    ShoppingCart,
-    Subscription,
-    Tag,
-    User,
-)
 from .pagination import CustomPagination
-from .serializers import (
-    AvatarSerializer,
-    CustomUserSerializer,
-    FavoriteSerializer,
-    IngredientSerializer,
-    RecipeSerializer,
-    ShoppingCartRecipeSerializer,
-    ShortRecipeSerializer,
-    TagSerializer,
-    UserRegistrationSerializer,
-)
+from .serializers import (AvatarSerializer, CustomUserSerializer,
+                          FavoriteSerializer, IngredientSerializer,
+                          RecipeSerializer, ShoppingCartRecipeSerializer,
+                          ShortRecipeSerializer, TagSerializer,
+                          UserRegistrationSerializer)
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
