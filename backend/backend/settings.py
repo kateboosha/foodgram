@@ -12,7 +12,9 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', get_random_secret_key())
 
 DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('true', '1')
 
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = 'foodgram.fun', 'localhost', '127.0.0.1'
+
+# пока возникла путаница с .env ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 SHORT_LINK_BASE_URL = os.getenv('SHORT_LINK_BASE_URL', 'http://localhost:8000/')
 
