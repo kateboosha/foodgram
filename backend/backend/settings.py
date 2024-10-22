@@ -70,7 +70,7 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 AUTH_USER_MODEL = 'foodgram.User'
 
-
+# Для прода.
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -82,6 +82,13 @@ DATABASES = {
     }
 }
 
+# Для локальной разработки.
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 
 DJOSER = {
     'LOGIN_FIELD': 'email',
