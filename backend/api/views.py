@@ -70,7 +70,6 @@ class CustomViewSet(UserViewSet):
         elif request.method == "DELETE":
             return self.remove_subscription(request, author)
 
-
     def add_subscription(self, request, author):
         if author == request.user:
             return Response(
