@@ -10,7 +10,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', get_random_secret_key())
 
-DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('true', '1')
+DEBUG = True
+
+#DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('true', '1')
 
 ALLOWED_HOSTS = 'foodgram.fun', 'localhost', '127.0.0.1'
 
@@ -67,6 +69,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'backend.wsgi.application'
 
 AUTH_USER_MODEL = 'foodgram.User'
+
 
 DATABASES = {
     'default': {
