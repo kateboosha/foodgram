@@ -62,13 +62,14 @@ class CustomViewSet(UserViewSet):
         permission_classes=[IsAuthenticated],
         url_path="subscribe",
     )
-    def subscribe(self, request, id=None):
-        author = get_object_or_404(User, id=id)
+    def subscribe(self, request, pk=None):
+        author = get_object_or_404(User, pk=pk)
 
         if request.method == "POST":
             return self.add_subscription(request, author)
         elif request.method == "DELETE":
             return self.remove_subscription(request, author)
+
 
     def add_subscription(self, request, author):
         if author == request.user:
