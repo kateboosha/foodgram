@@ -16,6 +16,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = 'foodgram.fun', 'localhost', '127.0.0.1'
 
+CSRF_TRUSTED_ORIGINS = ['http://localhost:8000']
+
 # пока возникла путаница с .env ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 SHORT_LINK_BASE_URL = os.getenv('SHORT_LINK_BASE_URL', 'http://localhost:8000/')
