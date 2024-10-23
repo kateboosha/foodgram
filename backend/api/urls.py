@@ -1,16 +1,21 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import CustomViewSet, IngredientViewSet, RecipeViewSet, TagViewSet
+from .views import (FoodgramUserViewSet, IngredientViewSet, RecipeViewSet,
+                    TagViewSet, redirect_to_recipe)
 
 router = DefaultRouter()
-router.register(r'users', CustomViewSet, basename='users')
-router.register(r'tags', TagViewSet, basename='tags')
-router.register(r'ingredients', IngredientViewSet, basename='ingredients')
-router.register(r'recipes', RecipeViewSet, basename='recipes')
-
+router.register('users', FoodgramUserViewSet, basename='users')
+router.register('tags', TagViewSet, basename='tags')
+router.register('ingredients', IngredientViewSet, basename='ingredients')
+router.register('recipes', RecipeViewSet, basename='recipes')
 
 urlpatterns = [
     path('', include(router.urls)),
     path('auth/', include('djoser.urls.authtoken')),
+    path(
+        's/<str:short_link>/',
+        redirect_to_recipe,
+        name='short_link_redirect'
+    ),
 ]

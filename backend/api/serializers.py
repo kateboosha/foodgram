@@ -1,11 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
-
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 
 from foodgram.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
                              ShoppingCart, Subscription, Tag)
+
 from .fields import Base64ImageField
 
 User = get_user_model()
@@ -19,6 +19,11 @@ class AvatarSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('avatar',)
+
+    def validate_avatar(self, value):
+        if value is None:
+            raise serializers.ValidationError("Это поле не может быть пустым.")
+        return value
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
@@ -154,7 +159,9 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
 
     def validate_image(self, value):
         if not value:
-            raise serializers.ValidationError("Поле 'image' не может быть пустым.")
+            raise serializers.ValidationError(
+                "Поле 'image' не может быть пустым."
+            )
         return value
 
     @transaction.atomic
@@ -228,6 +235,21 @@ class FavoriteSerializer(serializers.ModelSerializer):
             )
         ]
 
+    def validate(self, data):
+        user = self.context['request'].user
+        recipe = data['recipe']
+
+        if Favorite.objects.filter(user=user, recipe=recipe).exists():
+            raise serializers.ValidationError("Рецепт уже в избранном.")
+
+        return data
+
+    def to_representation(self, instance):
+        from .serializers import ShortRecipeSerializer
+        return ShortRecipeSerializer(
+            instance.recipe, context=self.context
+        ).data
+
 
 class ShoppingCartSerializer(serializers.ModelSerializer):
     class Meta:
@@ -240,6 +262,21 @@ class ShoppingCartSerializer(serializers.ModelSerializer):
                 message="Этот рецепт уже добавлен в корзину."
             )
         ]
+
+    def validate(self, data):
+        user = self.context['request'].user
+        recipe = data['recipe']
+
+        if ShoppingCart.objects.filter(user=user, recipe=recipe).exists():
+            raise serializers.ValidationError("Рецепт уже добавлен в корзину.")
+
+        return data
+
+    def to_representation(self, instance):
+        from .serializers import ShortRecipeSerializer
+        return ShortRecipeSerializer(
+            instance.recipe, context=self.context
+        ).data
 
 
 class SubscriptionSerializer(UserDetailSerializer):
@@ -274,7 +311,7 @@ class SubscriptionSerializer(UserDetailSerializer):
         return ShortRecipeSerializer(
             recipes, many=True, context=self.context
         ).data
-    
+
 
 class SubscriptionActionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -286,9 +323,15 @@ class SubscriptionActionSerializer(serializers.ModelSerializer):
         author = data['subscribed_to']
 
         if user == author:
-            raise serializers.ValidationError("Нельзя подписаться на самого себя.")
-        
-        if Subscription.objects.filter(user=user, subscribed_to=author).exists():
-            raise serializers.ValidationError("Вы уже подписаны на этого пользователя.")
-        
+            raise serializers.ValidationError(
+                "Нельзя подписаться на самого себя."
+            )
+
+        if Subscription.objects.filter(
+            user=user, subscribed_to=author
+        ).exists():
+            raise serializers.ValidationError(
+                "Вы уже подписаны на этого пользователя."
+            )
+
         return data

@@ -1,6 +1,6 @@
 from django.contrib import admin
-from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 
 from .models import (Favorite, Ingredient, Recipe, RecipeIngredient,
                      ShoppingCart, Tag)
@@ -60,6 +60,3 @@ class ShoppingCartAdmin(admin.ModelAdmin):
 class UserAdmin(admin.ModelAdmin):
     list_display = ("username", "email", "first_name", "last_name")
     search_fields = ("username", "email")
-
-
-admin.site.unregister(Group)

@@ -1,20 +1,16 @@
+import hashlib
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
-from django.db import models
-from django.db.models import Q
 from django.core.validators import MinValueValidator
+from django.db import models
+from django.db.models import F, Q
 
-from .constants import (
-    EMAIL_MAX_LENGTH,
-    FIRST_NAME_MAX_LENGTH,
-    INGREDIENT_NAME_MAX_LENGTH,
-    LAST_NAME_MAX_LENGTH,
-    MEASUREMENT_UNIT_MAX_LENGTH,
-    RECIPE_NAME_MAX_LENGTH,
-    TAG_NAME_MAX_LENGTH,
-    TAG_SLUG_MAX_LENGTH,
-    USERNAME_MAX_LENGTH,
-)
+from .constants import (EMAIL_MAX_LENGTH, FIRST_NAME_MAX_LENGTH,
+                        INGREDIENT_NAME_MAX_LENGTH, LAST_NAME_MAX_LENGTH,
+                        MEASUREMENT_UNIT_MAX_LENGTH, RECIPE_NAME_MAX_LENGTH,
+                        TAG_NAME_MAX_LENGTH, TAG_SLUG_MAX_LENGTH,
+                        USERNAME_MAX_LENGTH)
 
 
 class User(AbstractUser):
@@ -108,12 +104,23 @@ class Recipe(models.Model):
     is_favorited = models.BooleanField(default=False)
     is_in_shopping_cart = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    short_link_hash = models.CharField(max_length=6, unique=True, blank=True)
 
     class Meta:
         ordering = ("-created_at",)
 
     def __str__(self):
         return self.name
+
+    def generate_short_link(self):
+        """Генерация короткой ссылки по ID рецепта."""
+        return hashlib.md5(str(self.id).encode()).hexdigest()[:6]
+
+    def save(self, *args, **kwargs):
+        """Сохранение объекта с генерацией короткой ссылки при создании."""
+        if not self.short_link_hash:
+            self.short_link_hash = self.generate_short_link()
+        super().save(*args, **kwargs)
 
 
 class RecipeIngredient(models.Model):
