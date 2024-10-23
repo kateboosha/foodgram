@@ -13,16 +13,27 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from django.contrib.auth import get_user_model
+from django_filters import rest_framework as filters
 
 from foodgram.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
-                             ShoppingCart, Subscription, Tag, User)
-
+                             ShoppingCart, Subscription, Tag)
 from .pagination import CustomPagination
-from .serializers import (AvatarSerializer, CustomUserSerializer,
+from .serializers import (AvatarSerializer, UserDetailSerializer, SubscriptionActionSerializer,
                           FavoriteSerializer, IngredientSerializer,
-                          RecipeSerializer, ShoppingCartRecipeSerializer,
                           ShortRecipeSerializer, TagSerializer,
-                          UserRegistrationSerializer)
+                          )
+
+
+User = get_user_model()
+
+
+class IngredientFilter(filters.FilterSet):
+    name = filters.CharFilter(field_name="name", lookup_expr="icontains")
+
+    class Meta:
+        model = Ingredient
+        fields = ["name"]
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
@@ -37,40 +48,24 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = IngredientSerializer
     permission_classes = (AllowAny,)
     pagination_class = None
-
-    def get_queryset(self):
-        queryset = Ingredient.objects.all()
-        name = self.request.query_params.get("name")
-        if name:
-            queryset = queryset.filter(name__icontains=name)
-        return queryset
+    filter_backends = (filters.DjangoFilterBackend,)
+    filterset_class = IngredientFilter
 
 
-class CustomViewSet(UserViewSet):
-    serializer_class = CustomUserSerializer
+class FoodgramUserViewSet(UserViewSet):
+    serializer_class = UserDetailSerializer
     pagination_class = CustomPagination
-    permission_classes_by_action = {
-        "create": (AllowAny,),
-        "list": (AllowAny,),
-        "retrieve": (AllowAny,),
-        "set_password": (IsAuthenticated,),
-    }
+    permission_classes = (AllowAny,)
 
     @action(
         detail=True,
-        methods=["post", "delete"],
+        methods=["post"],
         permission_classes=[IsAuthenticated],
         url_path="subscribe",
     )
     def subscribe(self, request, pk=None):
         author = get_object_or_404(User, pk=pk)
 
-        if request.method == "POST":
-            return self.add_subscription(request, author)
-        elif request.method == "DELETE":
-            return self.remove_subscription(request, author)
-
-    def add_subscription(self, request, author):
         if author == request.user:
             return Response(
                 {"detail": "Нельзя подписаться на самого себя."},
@@ -88,14 +83,11 @@ class CustomViewSet(UserViewSet):
 
         Subscription.objects.create(user=request.user, subscribed_to=author)
 
-        serializer = CustomUserSerializer(author, context={"request": request})
+        serializer = UserDetailSerializer(author, context={"request": request})
         data = serializer.data
 
         recipes_limit = request.query_params.get("recipes_limit")
-        if recipes_limit is not None:
-            recipes = author.recipes.all()[:int(recipes_limit)]
-        else:
-            recipes = author.recipes.all()
+        recipes = author.recipes.all()[:int(recipes_limit)] if recipes_limit else author.recipes.all()
 
         data["recipes"] = ShortRecipeSerializer(
             recipes,
@@ -105,8 +97,30 @@ class CustomViewSet(UserViewSet):
         data["recipes_count"] = author.recipes.count()
 
         return Response(data, status=status.HTTP_201_CREATED)
+    
+    def add_subscription(self, request, author):
+        data = {'user': request.user.id, 'subscribed_to': author.id}
+        serializer = SubscriptionActionSerializer(data=data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
-    def remove_subscription(self, request, author):
+        author_with_recipes = User.objects.annotate(recipes_count=Count('recipes')).get(id=author.id)
+
+        user_data = UserDetailSerializer(author_with_recipes, context={"request": request}).data
+        recipes_limit = request.query_params.get("recipes_limit")
+        recipes = author.recipes.all()[:int(recipes_limit)] if recipes_limit else author.recipes.all()
+
+        user_data["recipes"] = ShortRecipeSerializer(
+            recipes,
+            many=True,
+            context={"request": request}
+        ).data
+
+        return Response(user_data, status=status.HTTP_201_CREATED)
+
+    @subscribe.mapping.delete
+    def remove_subscription(self, request, pk=None):
+        author = get_object_or_404(User, pk=pk)
         subscription = Subscription.objects.filter(
             user=request.user,
             subscribed_to=author
@@ -142,12 +156,9 @@ class CustomViewSet(UserViewSet):
         recipes_limit = request.query_params.get("recipes_limit")
         results = []
         for author in authors:
-            if recipes_limit is not None:
-                recipes = author.recipes.all()[:int(recipes_limit)]
-            else:
-                recipes = author.recipes.all()
+            recipes = author.recipes.all()[:int(recipes_limit)] if recipes_limit else author.recipes.all()
 
-            author_data = CustomUserSerializer(
+            author_data = UserDetailSerializer(
                 author,
                 context={"request": request}
             ).data
@@ -166,75 +177,13 @@ class CustomViewSet(UserViewSet):
 
         return Response({"results": results})
 
-    def create(self, request, *args, **kwargs):
-        serializer = UserRegistrationSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        return Response(
-            {
-                "email": user.email,
-                "id": user.id,
-                "username": user.username,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
-    def get_permissions(self):
-        return [
-            permission()
-            for permission in self.permission_classes_by_action.get(
-                self.action, self.permission_classes
-            )
-        ]
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
-    @action(
-        detail=False,
-        methods=["post"],
-        permission_classes=[IsAuthenticated]
-    )
-    def set_password(self, request):
-        current_password = request.data.get("current_password")
-        new_password = request.data.get("new_password")
-
-        if not current_password or not new_password:
-            return Response(
-                {
-                    "current_password": ["Обязательное поле."],
-                    "new_password": ["Обязательное поле."],
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        user = request.user
-        if not user.check_password(current_password):
-            return Response(
-                {"detail": "Текущий пароль неверен."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        user.set_password(new_password)
-        user.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
     @action(
         detail=False,
         methods=["get"],
         permission_classes=[IsAuthenticated]
     )
     def me(self, request):
-        serializer = CustomUserSerializer(
+        serializer = UserDetailSerializer(
             request.user,
             context={"request": request}
         )
@@ -269,10 +218,9 @@ class CustomViewSet(UserViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        elif request.method == "DELETE":
-            user.avatar.delete(save=True)
-            user.save()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+        user.avatar.delete(save=True)
+        user.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class RecipeViewSet(viewsets.ModelViewSet):

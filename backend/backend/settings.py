@@ -10,15 +10,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', get_random_secret_key())
 
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('true', '1')
 
-# DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('true', '1')
-
-ALLOWED_HOSTS = 'foodgram.fun', 'localhost', '127.0.0.1'
-
-CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'https://foodgram.fun/']
-
-# пока возникла путаница с .env ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 SHORT_LINK_BASE_URL = os.getenv('SHORT_LINK_BASE_URL', 'http://localhost:8000/')
 
@@ -73,24 +67,39 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 AUTH_USER_MODEL = 'foodgram.User'
 
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('POSTGRES_DB', 'django'),
-        'USER': os.getenv('POSTGRES_USER', 'django'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', ''),
-        'PORT': os.getenv('DB_PORT', 5432),
+USE_POSTGRES = os.getenv('USE_POSTGRES', 'False').lower() in ('true', '1', 'yes')
+
+if USE_POSTGRES:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('POSTGRES_DB', 'django'),
+            'USER': os.getenv('POSTGRES_USER', 'django'),
+            'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', ''),
+            'PORT': os.getenv('DB_PORT', 5432),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        }
+    }
 
 
 DJOSER = {
     'LOGIN_FIELD': 'email',
     'SERIALIZERS': {
-        'user_create': 'api.serializers.UserRegistrationSerializer',
+        'user': 'api.serializers.UserDetailSerializer',
+        'current_user': 'api.serializers.UserDetailSerializer',
     },
-    'TOKEN_MODEL': 'rest_framework.authtoken.models.Token',
+    'PERMISSIONS': {
+        'user': 'rest_framework.permissions.AllowAny',
+        'user_list': 'rest_framework.permissions.AllowAny',
+    },
+    'HIDE_USERS': False,
 }
 
 
@@ -126,11 +135,13 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = '/app/media/'
+
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
 STATIC_URL = '/static/django/'
-STATIC_ROOT = '/app/static_django/'
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'static_django')
 
 
 LANGUAGE_CODE = 'en-us'
