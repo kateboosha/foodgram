@@ -17,9 +17,7 @@ services:
       - pg_data:/var/lib/postgresql/data
 
   backend:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
+    image: kateboosha/foodgram-backend:latest
     env_file:
       - ../backend/.env
     volumes:
@@ -29,9 +27,7 @@ services:
       - db
 
   frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
+    image: kateboosha/foodgram-frontend:latest
     volumes:
       - ../frontend/build:/app/result_build/
 
