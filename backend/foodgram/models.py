@@ -92,7 +92,7 @@ class Recipe(models.Model):
     )
     name = models.CharField(max_length=RECIPE_NAME_MAX_LENGTH)
     image = models.ImageField(upload_to="recipes/")
-    description = models.TextField()
+    text = models.TextField()
     ingredients = models.ManyToManyField(
         Ingredient, through="RecipeIngredient", related_name="recipes"
     )
@@ -100,8 +100,8 @@ class Recipe(models.Model):
     cooking_time = models.PositiveIntegerField(
         validators=[MinValueValidator(1)]
     )
-    is_favorited = models.BooleanField(default=False)
-    is_in_shopping_cart = models.BooleanField(default=False)
+    # is_favorited = models.BooleanField(default=False)
+    # is_in_shopping_cart = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     short_link_hash = models.CharField(max_length=6, unique=True, blank=True)
 

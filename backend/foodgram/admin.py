@@ -18,18 +18,21 @@ class RecipeAdmin(admin.ModelAdmin):
         "name",
         "author",
         "cooking_time",
-        "is_favorited",
-        "is_in_shopping_cart",
         "favorites_count",
+        "shopping_cart_count",
     )
     list_editable = ("cooking_time",)
     search_fields = ("name", "author__username")
-    list_filter = ("tags", "is_favorited")
+    list_filter = ("tags",)
     inlines = (RecipeIngredientInline,)
 
     @admin.display(description='Число добавлений в избранное')
     def favorites_count(self, obj):
-        return obj.favorites.count()
+        return obj.favorite_set.count()
+
+    @admin.display(description='Число добавлений в корзину')
+    def shopping_cart_count(self, obj):
+        return obj.shoppingcart_set.count()
 
 
 @admin.register(Tag)
