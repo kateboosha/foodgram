@@ -1,4 +1,3 @@
-import django_filters
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Count, Sum
@@ -10,11 +9,10 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-
 from foodgram.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
                              ShoppingCart, Subscription, Tag)
 
-from .filters import RecipeFilter
+from .filters import IngredientFilter, RecipeFilter
 from .pagination import CustomPagination
 from .permissions import IsAuthorOrReadOnly
 from .serializers import (AvatarSerializer, IngredientSerializer,
@@ -33,28 +31,17 @@ def redirect_to_recipe(request, short_link):
     return redirect(full_url)
 
 
-class IngredientFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(
-        field_name="name",
-        lookup_expr="icontains"
-    )
-
-    class Meta:
-        model = Ingredient
-        fields = ['name']
-
-
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
-    permission_classes = (AllowAny,)
+    permission_classes = [AllowAny]
     pagination_class = None
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
-    permission_classes = (AllowAny,)
+    permission_classes = [AllowAny]
     pagination_class = None
     filter_backends = (DjangoFilterBackend,)
     filterset_class = IngredientFilter
@@ -63,51 +50,69 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 class FoodgramUserViewSet(UserViewSet):
     serializer_class = UserDetailSerializer
     pagination_class = CustomPagination
-    permission_classes = (AllowAny,)
+    permission_classes = [AllowAny]
+
 
     @action(
         detail=True,
-        methods=["post"],
+        methods=["post", "delete"],
         permission_classes=[IsAuthenticated],
         url_path="subscribe",
     )
-    def subscribe(self, request, pk=None):
-        author = get_object_or_404(User, pk=pk)
+    def subscribe(self, request, id=None):
+        author = get_object_or_404(User, id=id)
 
-        if author == request.user:
-            return Response(
-                {"detail": "Нельзя подписаться на самого себя."},
-                status=status.HTTP_400_BAD_REQUEST,
+        if request.method == "POST":
+            if author == request.user:
+                return Response(
+                    {"detail": "Нельзя подписаться на самого себя."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if Subscription.objects.filter(
+                user=request.user,
+                subscribed_to=author
+            ).exists():
+                return Response(
+                    {"detail": "Вы уже подписаны на этого пользователя."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            Subscription.objects.create(user=request.user, subscribed_to=author)
+
+            serializer = UserDetailSerializer(author, context={"request": request})
+            data = serializer.data
+
+            recipes_limit = request.query_params.get("recipes_limit")
+            recipes = (
+                author.recipes.all()[:int(recipes_limit)]
+                if recipes_limit else author.recipes.all()
             )
 
-        if Subscription.objects.filter(
-            user=request.user,
-            subscribed_to=author
-        ).exists():
-            return Response(
-                {"detail": "Вы уже подписаны на этого пользователя."},
-                status=status.HTTP_400_BAD_REQUEST,
+            data["recipes"] = ShortRecipeSerializer(
+                recipes,
+                many=True,
+                context={"request": request}
+            ).data
+            data["recipes_count"] = author.recipes.count()
+
+            return Response(data, status=status.HTTP_201_CREATED)
+
+        elif request.method == "DELETE":
+            subscription = Subscription.objects.filter(
+                user=request.user,
+                subscribed_to=author
             )
 
-        Subscription.objects.create(user=request.user, subscribed_to=author)
+            if not subscription.exists():
+                return Response(
+                    {"detail": "Подписка не существует."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        serializer = UserDetailSerializer(author, context={"request": request})
-        data = serializer.data
+            subscription.delete()
 
-        recipes_limit = request.query_params.get("recipes_limit")
-        recipes = (
-            author.recipes.all()[:int(recipes_limit)]
-            if recipes_limit else author.recipes.all()
-        )
-
-        data["recipes"] = ShortRecipeSerializer(
-            recipes,
-            many=True,
-            context={"request": request}
-        ).data
-        data["recipes_count"] = author.recipes.count()
-
-        return Response(data, status=status.HTTP_201_CREATED)
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
     def add_subscription(self, request, author):
         data = {'user': request.user.id, 'subscribed_to': author.id}
@@ -183,14 +188,12 @@ class FoodgramUserViewSet(UserViewSet):
         return Response(serializer.data)
 
     def get_permissions(self):
+        print(self.permission_classes)
         if self.action == "me":
             return [IsAuthenticated()]
-        return [
-            permission()
-            for permission in self.permission_classes_by_action.get(
-                self.action, self.permission_classes
-            )
-        ]
+        permissions = super().get_permissions()
+        print(permissions)
+        return permissions
 
     @action(
         detail=False,
@@ -286,6 +289,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED
         )
 
+    @action(
+        detail=True,
+        methods=["delete"],
+        permission_classes=[IsAuthenticated],
+        url_path="remove-from-list"
+    )
     def remove_from_list(self, request, pk, model):
         recipe = get_object_or_404(Recipe, pk=pk)
         item = model.objects.filter(user=request.user, recipe=recipe)

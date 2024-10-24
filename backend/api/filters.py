@@ -1,6 +1,7 @@
 from django_filters import rest_framework as filters
+import django_filters
 
-from foodgram.models import Recipe
+from foodgram.models import Ingredient, Recipe
 
 
 class RecipeFilter(filters.FilterSet):
@@ -26,6 +27,17 @@ class RecipeFilter(filters.FilterSet):
         user = self.request.user
         if user.is_authenticated:
             if value:
-                return queryset.filter(shoppingcart__user=user)
-            return queryset.exclude(shoppingcart__user=user)
+                return queryset.filter(shopping_cart__user=user)
+            return queryset.exclude(shopping_cart__user=user)
         return queryset
+
+
+class IngredientFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="name",
+        lookup_expr="istartswith"
+    )
+
+    class Meta:
+        model = Ingredient
+        fields = ['name']

@@ -20,10 +20,10 @@ class AvatarSerializer(serializers.ModelSerializer):
         model = User
         fields = ('avatar',)
 
-    def validate_avatar(self, value):
-        if value is None:
-            raise serializers.ValidationError("Это поле не может быть пустым.")
-        return value
+    def validate(self, data):
+        if 'avatar' not in data:
+            raise serializers.ValidationError({"avatar": "Это поле обязательно."})
+        return data
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
@@ -93,6 +93,9 @@ class RecipeReadSerializer(serializers.ModelSerializer):
     )
     tags = TagSerializer(many=True, read_only=True)
     image = Base64ImageField()
+    is_favorited = serializers.SerializerMethodField()
+    is_in_shopping_cart = serializers.SerializerMethodField()
+    text = serializers.CharField(source='description', read_only=True)
 
     class Meta:
         model = Recipe
@@ -104,7 +107,22 @@ class RecipeReadSerializer(serializers.ModelSerializer):
             "ingredients",
             "tags",
             "cooking_time",
+            "is_favorited",
+            "is_in_shopping_cart",
+            "text",
         )
+
+    def get_is_favorited(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Favorite.objects.filter(user=request.user, recipe=obj).exists()
+        return False
+
+    def get_is_in_shopping_cart(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return ShoppingCart.objects.filter(user=request.user, recipe=obj).exists()
+        return False
 
 
 class RecipeIngredientCreateSerializer(serializers.ModelSerializer):
@@ -179,11 +197,13 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         ingredients_data = validated_data.pop("ingredients", None)
         tags_data = validated_data.pop("tags", None)
 
-        instance.recipe_ingredients.clear()
-        instance.tags.clear()
+        if ingredients_data:
+            instance.recipe_ingredients.clear()
+            self._save_ingredients(instance, ingredients_data)
 
-        self._save_ingredients(instance, ingredients_data)
-        instance.tags.set(tags_data)
+        if tags_data:
+            instance.tags.clear()
+            instance.tags.set(tags_data)
 
         return super().update(instance, validated_data)
 
@@ -279,13 +299,18 @@ class ShoppingCartSerializer(serializers.ModelSerializer):
         ).data
 
 
-class SubscriptionSerializer(UserDetailSerializer):
+class SubscriptionSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField()
+    username = serializers.CharField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    avatar = serializers.ImageField()
+    is_subscribed = serializers.SerializerMethodField()
     recipes = serializers.SerializerMethodField()
-    recipes_count = serializers.IntegerField(
-        source='recipes.count', read_only=True
-    )
+    recipes_count = serializers.IntegerField(source='recipes.count', read_only=True)
 
     class Meta:
+        model = User
         fields = (
             'email',
             'id',
@@ -311,6 +336,11 @@ class SubscriptionSerializer(UserDetailSerializer):
         return ShortRecipeSerializer(
             recipes, many=True, context=self.context
         ).data
+
+    def get_is_subscribed(self, obj):
+        """Проверяет, подписан ли текущий пользователь на автора."""
+        user = self.context['request'].user
+        return Subscription.objects.filter(user=user, subscribed_to=obj).exists()
 
 
 class SubscriptionActionSerializer(serializers.ModelSerializer):

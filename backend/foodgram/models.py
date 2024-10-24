@@ -1,10 +1,9 @@
-import hashlib
-
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import F, Q
+from django.utils.crypto import get_random_string
 
 from .constants import (EMAIL_MAX_LENGTH, FIRST_NAME_MAX_LENGTH,
                         INGREDIENT_NAME_MAX_LENGTH, LAST_NAME_MAX_LENGTH,
@@ -113,11 +112,12 @@ class Recipe(models.Model):
         return self.name
 
     def generate_short_link(self):
-        """Генерация короткой ссылки по ID рецепта."""
-        return hashlib.md5(str(self.id).encode()).hexdigest()[:6]
+        while True:
+            short_link = get_random_string(6)
+            if not Recipe.objects.filter(short_link_hash=short_link).exists():
+                return short_link
 
     def save(self, *args, **kwargs):
-        """Сохранение объекта с генерацией короткой ссылки при создании."""
         if not self.short_link_hash:
             self.short_link_hash = self.generate_short_link()
         super().save(*args, **kwargs)
