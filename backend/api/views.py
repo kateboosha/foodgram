@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Count, Sum
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
 from rest_framework import filters as rest_framework_filters
@@ -25,12 +25,6 @@ from .serializers import (AvatarSerializer, FavoriteSerializer,
 from .utils import generate_pdf
 
 User = get_user_model()
-
-
-def redirect_to_recipe(request, short_link):
-    recipe = get_object_or_404(Recipe, short_link_hash=short_link)
-    full_url = request.build_absolute_uri(f'/recipes/{recipe.id}/')
-    return redirect(full_url)
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
