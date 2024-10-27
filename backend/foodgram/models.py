@@ -118,7 +118,8 @@ class Recipe(models.Model):
             self.short_link_hash = self.generate_short_link()
         super().save(*args, **kwargs)
 
-class RecipeIngredient(models.Model): 
+
+class RecipeIngredient(models.Model):
 
     recipe = models.ForeignKey(
         Recipe, related_name='recipe_ingredients', on_delete=models.CASCADE
@@ -128,19 +129,19 @@ class RecipeIngredient(models.Model):
         Ingredient, related_name='ingredient_recipes', on_delete=models.CASCADE
     )
 
-    amount = models.PositiveIntegerField()
+    amount = models.PositiveIntegerField(validators=[MinValueValidator(1)])
 
-    class Meta: 
+    class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=('recipe', 'ingredient'), 
+                fields=('recipe', 'ingredient'),
                 name='unique_recipe_ingredient'
             )
         ]
         ordering = ('recipe',)
 
 
-class UserRecipeBase(models.Model): 
+class UserRecipeBase(models.Model):
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -152,8 +153,8 @@ class UserRecipeBase(models.Model):
         on_delete=models.CASCADE
     )
 
-    class Meta: 
-        abstract = True 
+    class Meta:
+        abstract = True
         constraints = [
             models.UniqueConstraint(
                 fields=['user', 'recipe'],
@@ -162,20 +163,20 @@ class UserRecipeBase(models.Model):
         ]
 
 
-class Favorite(UserRecipeBase): 
+class Favorite(UserRecipeBase):
 
-    class Meta: 
+    class Meta:
         default_related_name = 'favorites'
 
-    def __str__(self): 
+    def __str__(self):
         return f'{self.user.email} добавил {self.recipe.name} в избранное'
 
 
-class ShoppingCart(UserRecipeBase): 
+class ShoppingCart(UserRecipeBase):
 
-    class Meta: 
-        db_table = 'shopping_cart' 
+    class Meta:
+        db_table = 'shopping_cart'
         default_related_name = 'shopping_cart'
 
-    def __str__(self): 
+    def __str__(self):
         return f'{self.user.email} добавил {self.recipe.name} в корзину'

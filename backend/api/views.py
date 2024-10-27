@@ -4,7 +4,6 @@ from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
-from rest_framework import filters as rest_framework_filters
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import (AllowAny, IsAuthenticated,
@@ -17,9 +16,8 @@ from foodgram.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
 from .filters import IngredientFilter, RecipeFilter
 from .pagination import CustomPagination
 from .permissions import IsAuthorOrReadOnly
-from .serializers import (AvatarSerializer, FavoriteSerializer,
-                          IngredientSerializer, RecipeCreateSerializer,
-                          RecipeReadSerializer, ShoppingCartSerializer,
+from .serializers import (AvatarSerializer, IngredientSerializer,
+                          RecipeCreateSerializer, RecipeReadSerializer,
                           ShortRecipeSerializer, SubscriptionActionSerializer,
                           SubscriptionSerializer, TagSerializer,
                           UserDetailSerializer)
@@ -90,8 +88,11 @@ class FoodgramUserViewSet(UserViewSet):
             user_data = serializer.data  # для постма
             # для постман
             recipes_limit = request.query_params.get('recipes_limit')
-            recipes = author.recipes.all()[:int(recipes_limit)] if recipes_limit else author.recipes.all()
-
+            recipes = (
+                author.recipes.all()[:int(recipes_limit)]
+                if recipes_limit
+                else author.recipes.all()
+            )
             user_data['recipes'] = ShortRecipeSerializer(
                 recipes,
                 many=True,
@@ -234,7 +235,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
             )
 
         model.objects.create(user=request.user, recipe=recipe)
-        return Response(status=status.HTTP_201_CREATED)
+        serializer = ShortRecipeSerializer(
+            recipe,
+            context={'request': request}
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def remove_from_collection(self, request, pk, model, error_message):
         recipe = get_object_or_404(Recipe, pk=pk)
