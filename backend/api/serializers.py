@@ -42,7 +42,6 @@ class UserDetailSerializer(serializers.ModelSerializer):
             'username',
             'first_name',
             'last_name',
-            'password',
             'is_subscribed',
             'avatar',
         )
@@ -156,6 +155,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             'cooking_time',
             'text',
         )
+        read_only_fields = ('author',)
 
     def validate(self, data):
 
@@ -213,12 +213,12 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        # delete clear problem
         ingredients_data = validated_data.pop('ingredients')
         tags_data = validated_data.pop('tags')
-        RecipeIngredient.objects.filter(recipe=instance).clear()
+        RecipeIngredient.objects.filter(recipe=instance).delete()
         self._save_ingredients(instance, ingredients_data)
         instance.tags.set(tags_data, clear=True)
-
         return super().update(instance, validated_data)
 
     @staticmethod

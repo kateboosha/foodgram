@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -116,3 +117,65 @@ class Recipe(models.Model):
         if not self.short_link_hash:
             self.short_link_hash = self.generate_short_link()
         super().save(*args, **kwargs)
+
+class RecipeIngredient(models.Model): 
+
+    recipe = models.ForeignKey(
+        Recipe, related_name='recipe_ingredients', on_delete=models.CASCADE
+    )
+
+    ingredient = models.ForeignKey(
+        Ingredient, related_name='ingredient_recipes', on_delete=models.CASCADE
+    )
+
+    amount = models.PositiveIntegerField()
+
+    class Meta: 
+        constraints = [
+            models.UniqueConstraint(
+                fields=('recipe', 'ingredient'), 
+                name='unique_recipe_ingredient'
+            )
+        ]
+        ordering = ('recipe',)
+
+
+class UserRecipeBase(models.Model): 
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE
+    )
+
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE
+    )
+
+    class Meta: 
+        abstract = True 
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'recipe'],
+                name='unique_%(class)s_user_recipe'
+            )
+        ]
+
+
+class Favorite(UserRecipeBase): 
+
+    class Meta: 
+        default_related_name = 'favorites'
+
+    def __str__(self): 
+        return f'{self.user.email} добавил {self.recipe.name} в избранное'
+
+
+class ShoppingCart(UserRecipeBase): 
+
+    class Meta: 
+        db_table = 'shopping_cart' 
+        default_related_name = 'shopping_cart'
+
+    def __str__(self): 
+        return f'{self.user.email} добавил {self.recipe.name} в корзину'
