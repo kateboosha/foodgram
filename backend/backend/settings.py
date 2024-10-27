@@ -10,15 +10,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', get_random_secret_key())
 
-DEBUG = True
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
 
-# ALLOWED_HOSTS = ['*']
-
-ALLOWED_HOSTS = ['foodgram.fun', 'www.foodgram.fun', '127.0.0.1', 'localhost']
-
-# DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('true', '1')
-
-# ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('true', '1')
 
 SHORT_LINK_BASE_URL = os.getenv('SHORT_LINK_BASE_URL', 'http://localhost:8000/')
 
