@@ -99,7 +99,7 @@ class Recipe(models.Model):
         validators=[MinValueValidator(1)]
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    short_link_hash = models.CharField(max_length=6, unique=True, blank=True)
+    short_link_hash = models.CharField(max_length=6, unique=True, blank=False)
 
     class Meta:
         ordering = ('-created_at',)
