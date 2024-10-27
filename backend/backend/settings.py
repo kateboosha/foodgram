@@ -14,11 +14,11 @@ DEBUG = True
 
 # ALLOWED_HOSTS = ['*']
 
-# ALLOWED_HOSTS = ['foodgram.fun', 'www.foodgram.fun', '127.0.0.1', 'localhost']
+ALLOWED_HOSTS = ['foodgram.fun', 'www.foodgram.fun', '127.0.0.1', 'localhost']
 
 # DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('true', '1')
 
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 SHORT_LINK_BASE_URL = os.getenv('SHORT_LINK_BASE_URL', 'http://localhost:8000/')
 
