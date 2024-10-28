@@ -7,9 +7,9 @@ from django.utils.crypto import get_random_string
 
 from .constants import (EMAIL_MAX_LENGTH, FIRST_NAME_MAX_LENGTH,
                         INGREDIENT_NAME_MAX_LENGTH, LAST_NAME_MAX_LENGTH,
-                        MEASUREMENT_UNIT_MAX_LENGTH, RECIPE_NAME_MAX_LENGTH,
-                        TAG_NAME_MAX_LENGTH, TAG_SLUG_MAX_LENGTH,
-                        USERNAME_MAX_LENGTH)
+                        MEASUREMENT_UNIT_MAX_LENGTH, MIN_VALUE,
+                        RECIPE_NAME_MAX_LENGTH, TAG_NAME_MAX_LENGTH,
+                        TAG_SLUG_MAX_LENGTH, USERNAME_MAX_LENGTH)
 
 
 class User(AbstractUser):
@@ -96,7 +96,7 @@ class Recipe(models.Model):
     )
     tags = models.ManyToManyField(Tag, related_name='recipes')
     cooking_time = models.PositiveIntegerField(
-        validators=[MinValueValidator(1)]
+        validators=[MinValueValidator(MIN_VALUE)]
     )
     created_at = models.DateTimeField(auto_now_add=True)
     short_link_hash = models.CharField(max_length=6, unique=True, blank=False)
@@ -129,7 +129,9 @@ class RecipeIngredient(models.Model):
         Ingredient, related_name='ingredient_recipes', on_delete=models.CASCADE
     )
 
-    amount = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    amount = models.PositiveIntegerField(
+        validators=[MinValueValidator(MIN_VALUE)]
+    )
 
     class Meta:
         constraints = [
