@@ -25,6 +25,7 @@ services:
     volumes:
       - static:/app/static_django/
       - media:/app/media/
+      - ../data:/app/data 
     depends_on:
       - db
 
