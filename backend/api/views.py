@@ -190,8 +190,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
             settings,
             "SHORT_LINK_BASE_URL",
             "http://localhost:8000/"
-        )
-        short_link = f"{base_url}{recipe.short_link_hash}"
+        ).rstrip('/') + '/'
+        short_link = f"{base_url}s/{recipe.short_link_hash}"
         return Response({"short-link": short_link}, status=status.HTTP_200_OK)
 
     def add_to_collection(self, request, pk, model, error_message):
