@@ -213,10 +213,9 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        # delete clear problem
         ingredients_data = validated_data.pop('ingredients')
         tags_data = validated_data.pop('tags')
-        RecipeIngredient.objects.filter(recipe=instance).delete()
+        instance.ingredients.clear()
         self._save_ingredients(instance, ingredients_data)
         instance.tags.set(tags_data, clear=True)
         return super().update(instance, validated_data)
@@ -257,7 +256,6 @@ class FavoriteSerializer(serializers.ModelSerializer):
         ]
 
     def to_representation(self, instance):
-        from .serializers import ShortRecipeSerializer
         return ShortRecipeSerializer(
             instance.recipe, context=self.context
         ).data
@@ -339,22 +337,3 @@ class SubscriptionActionSerializer(serializers.ModelSerializer):
             )
 
         return data
-
-
-"""
-    def get_is_favorited(self, obj):
-        request = self.context.get('request')
-
-        Вот эту реализацию стоит забрать в сериализатор для чтения рецептов.
-        return (request and request.user.is_authenticated
-                and Favorite.objects.filter(
-                    user=request.user, recipe=obj
-                ).exists())
-
-    def get_is_in_shopping_cart(self, obj):
-        request = self.context.get('request')
-        return (request and request.user.is_authenticated
-                and ShoppingCart.objects.filter(
-                    user=request.user, recipe=obj
-                ).exists())
-"""
