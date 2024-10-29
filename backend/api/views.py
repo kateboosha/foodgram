@@ -184,17 +184,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     def add_to_collection(self, request, pk, model, error_message):
         recipe = get_object_or_404(Recipe, pk=pk)
-        if model.objects.filter(user=request.user, recipe=recipe).exists():
+        obj, created = model.objects.get_or_create(
+            user=request.user,
+            recipe=recipe
+        )
+        if not created:
             return Response(
                 {'detail': error_message}, status=status.HTTP_400_BAD_REQUEST
             )
-
-        model.objects.create(user=request.user, recipe=recipe)
         serializer = ShortRecipeSerializer(
             recipe,
             context={'request': request}
         )
-
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def remove_from_collection(self, request, pk, model, error_message):
@@ -255,4 +256,3 @@ class RecipeViewSet(viewsets.ModelViewSet):
             .order_by('ingredient__name')
         )
         return generate_pdf(user, ingredients)
-
