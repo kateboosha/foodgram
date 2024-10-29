@@ -84,36 +84,6 @@ class FoodgramUserViewSet(UserViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def manage_subscription(self, request, pk=None):
-        author = get_object_or_404(
-            User.objects.annotate(recipes_count=Count('recipes')), id=pk
-        ).order_by('-created_at')
-
-        if request.method == 'POST':
-            data = {'user': request.user.id, 'subscribed_to': author.id}
-            serializer = SubscriptionActionSerializer(
-                data=data, context={'request': request}
-            )
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            user_data = UserDetailSerializer(
-                author,
-                context={'request': request}
-            ).data
-            return Response(user_data, status=status.HTTP_201_CREATED)
-
-        deleted_count, _ = Subscription.objects.filter(
-            user=request.user, subscribed_to=author
-        ).delete()
-
-        if deleted_count == 0:
-            return Response(
-                {'detail': 'Подписка не существует.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
     @action(
         detail=False,
         methods=['get'],
@@ -184,7 +154,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     def add_to_collection(self, request, pk, model, error_message):
         recipe = get_object_or_404(Recipe, pk=pk)
-        obj, created = model.objects.get_or_create(
+        _, created = model.objects.get_or_create(
             user=request.user,
             recipe=recipe
         )
