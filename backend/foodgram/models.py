@@ -8,8 +8,9 @@ from django.utils.crypto import get_random_string
 from .constants import (EMAIL_MAX_LENGTH, FIRST_NAME_MAX_LENGTH,
                         INGREDIENT_NAME_MAX_LENGTH, LAST_NAME_MAX_LENGTH,
                         MEASUREMENT_UNIT_MAX_LENGTH, MIN_VALUE,
-                        RECIPE_NAME_MAX_LENGTH, TAG_NAME_MAX_LENGTH,
-                        TAG_SLUG_MAX_LENGTH, USERNAME_MAX_LENGTH)
+                        RECIPE_NAME_MAX_LENGTH, SHORT_LINK_LENGTH,
+                        TAG_NAME_MAX_LENGTH, TAG_SLUG_MAX_LENGTH,
+                        USERNAME_MAX_LENGTH)
 
 
 class User(AbstractUser):
@@ -109,7 +110,7 @@ class Recipe(models.Model):
 
     def generate_short_link(self):
         while True:
-            short_link = get_random_string(6)
+            short_link = get_random_string(SHORT_LINK_LENGTH)
             if not Recipe.objects.filter(short_link_hash=short_link).exists():
                 return short_link
 

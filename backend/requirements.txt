@@ -14,7 +14,7 @@ django-filter==2.4.0
 django-templated-mail==1.1.1
 djangorestframework==3.12.4
 djangorestframework-simplejwt==4.7.2
-djoser==2.0.3
+djoser==2.2.0
 gunicorn==20.1.0
 idna==3.10
 iniconfig==2.0.0
